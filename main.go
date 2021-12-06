@@ -12,14 +12,20 @@ func main() {
 
 	m.Get("/foo", func(rw http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(rw, "GET /foo")
-	}, func(hf http.HandlerFunc) http.HandlerFunc {
-		fmt.Println("middleware 1")
-		return hf
 	})
 
 	m.Post("/foo", func(rw http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(rw, "POST /foo")
 	})
 
+	m.Middleware("/foo", Logger)
+
 	m.Listen(":8080")
+}
+
+func Logger(hf http.HandlerFunc) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		fmt.Printf("%s %s %s\n", r.Proto, r.Method, r.URL.Path)
+		hf(rw, r)
+	}
 }

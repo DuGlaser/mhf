@@ -23,6 +23,15 @@ type Route struct {
 	middlewares []MiddlewareFunc
 }
 
+var (
+	methods = [...]string{
+		http.MethodGet,
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodDelete,
+	}
+)
+
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
 func New() *Mhf {
@@ -77,19 +86,31 @@ func (m *Mhf) add(method, path string, handler http.HandlerFunc, middlewares ...
 }
 
 func (m *Mhf) Get(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add("GET", path, handler, middlewares...)
+	m.add(http.MethodGet, path, handler, middlewares...)
 }
 
 func (m *Mhf) Post(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add("POST", path, handler, middlewares...)
+	m.add(http.MethodPost, path, handler, middlewares...)
 }
 
 func (m *Mhf) Put(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add("PUT", path, handler, middlewares...)
+	m.add(http.MethodPut, path, handler, middlewares...)
 }
 
 func (m *Mhf) Delete(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add("DELETE", path, handler, middlewares...)
+	m.add(http.MethodDelete, path, handler, middlewares...)
+}
+
+func (m *Mhf) Middleware(path string, middleware MiddlewareFunc) {
+	for _, method := range methods {
+		r, err := m.router.find(method, path)
+		if err != nil {
+			return
+		}
+
+		ms := append(r.middlewares, middleware)
+		m.router.add(method, path, r.handler, ms...)
+	}
 }
 
 func (r *Router) add(method, path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
