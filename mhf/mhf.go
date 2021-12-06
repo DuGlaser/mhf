@@ -13,10 +13,13 @@ type Mhf struct {
 }
 
 type Route struct {
-	method  string
-	path    string
-	handler http.HandlerFunc
+	method      string
+	path        string
+	handler     http.HandlerFunc
+	middlewares []MiddlewareFunc
 }
+
+type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
 func New() *Mhf {
 	m := &Mhf{
@@ -38,7 +41,11 @@ func (m *Mhf) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	route.handler(w, r)
+	handler := route.handler
+	for _, m := range route.middlewares {
+		handler = m(handler)
+	}
+	handler(w, r)
 }
 
 func (m *Mhf) Listen(addr string) {
@@ -50,7 +57,7 @@ func (m *Mhf) Listen(addr string) {
 	m.server.Serve(l)
 }
 
-func (m *Mhf) add(method, path string, handler http.HandlerFunc) {
+func (m *Mhf) add(method, path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
 	if path[0] != '/' {
 		path = fmt.Sprintf("/%s", path)
 	}
@@ -61,9 +68,10 @@ func (m *Mhf) add(method, path string, handler http.HandlerFunc) {
 	}
 
 	m.routes[method+path] = &Route{
-		method:  method,
-		path:    path,
-		handler: handler,
+		method:      method,
+		path:        path,
+		handler:     handler,
+		middlewares: middlewares,
 	}
 }
 
@@ -76,18 +84,18 @@ func (m *Mhf) find(method, path string) (*Route, error) {
 	return r, nil
 }
 
-func (m *Mhf) Get(path string, handler http.HandlerFunc) {
-	m.add("GET", path, handler)
+func (m *Mhf) Get(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	m.add("GET", path, handler, middlewares...)
 }
 
-func (m *Mhf) Post(path string, handler http.HandlerFunc) {
-	m.add("POST", path, handler)
+func (m *Mhf) Post(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	m.add("POST", path, handler, middlewares...)
 }
 
-func (m *Mhf) Put(path string, handler http.HandlerFunc) {
-	m.add("PUT", path, handler)
+func (m *Mhf) Put(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	m.add("PUT", path, handler, middlewares...)
 }
 
-func (m *Mhf) Delete(path string, handler http.HandlerFunc) {
-	m.add("DELETE", path, handler)
+func (m *Mhf) Delete(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	m.add("DELETE", path, handler, middlewares...)
 }

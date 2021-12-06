@@ -12,6 +12,9 @@ func main() {
 
 	m.Get("/foo", func(rw http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(rw, "GET /foo")
+	}, func(hf http.HandlerFunc) http.HandlerFunc {
+		fmt.Println("middleware 1")
+		return hf
 	})
 
 	m.Post("/foo", func(rw http.ResponseWriter, r *http.Request) {
