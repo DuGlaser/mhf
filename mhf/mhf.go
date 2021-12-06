@@ -51,6 +51,10 @@ func (m *Mhf) Listen(addr string) {
 }
 
 func (m *Mhf) add(method, path string, handler http.HandlerFunc) {
+	if path[0] != '/' {
+		path = fmt.Sprintf("/%s", path)
+	}
+
 	if m.routes[method+path] != nil {
 		fmt.Printf("%s(%s) is already resisted.", path, method)
 		return
