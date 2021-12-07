@@ -62,8 +62,8 @@ func (m *Mhf) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	currentNode := m.router.tree
 	isNotMatch := false
 
-	middlewares := make([]MiddlewareFunc, len(currentNode.middlewares))
-	middlewares = append(middlewares, currentNode.middlewares...)
+	middlewares := currentNode.middlewares
+
 	for _, si := range s {
 		n := currentNode
 		for _, ch := range currentNode.children {
@@ -214,8 +214,13 @@ func (r *Router) createNode(path string) (*Node, error) {
 
 func (r *Router) findNode(path string) (*Node, error) {
 	path = deleteSlushPrefix(path)
-	s := strings.Split(path, "/")
 	currentNode := r.tree
+
+	s := strings.Split(path, "/")
+	if s[0] == "" {
+		return currentNode, nil
+	}
+
 	isNotMatch := false
 	for _, si := range s {
 		n := currentNode
