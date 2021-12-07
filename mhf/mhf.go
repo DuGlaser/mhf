@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 )
 
 type Mhf struct {
@@ -13,13 +14,14 @@ type Mhf struct {
 }
 
 type Router struct {
-	routes map[string]*Route
+	tree *Node
 }
 
-type Route struct {
-	method      string
-	path        string
-	handler     http.HandlerFunc
+type Node struct {
+	parent      *Node
+	children    []*Node
+	prefix      string
+	handler     map[string]http.HandlerFunc
 	middlewares []MiddlewareFunc
 }
 
@@ -38,7 +40,12 @@ func New() *Mhf {
 	m := &Mhf{
 		server: new(http.Server),
 		router: &Router{
-			routes: make(map[string]*Route),
+			tree: &Node{
+				prefix:      "",
+				children:    make([]*Node, 0),
+				handler:     make(map[string]http.HandlerFunc),
+				middlewares: make([]MiddlewareFunc, 0),
+			},
 		},
 	}
 
@@ -48,18 +55,51 @@ func New() *Mhf {
 
 func (m *Mhf) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	method := r.Method
-	path := r.URL.Path
+	path := deleteSlushPrefix(r.URL.Path)
 
-	route, err := m.router.find(method, path)
-	if err != nil {
+	s := strings.Split(path, "/")
+
+	currentNode := m.router.tree
+	isNotMatch := false
+
+	middlewares := make([]MiddlewareFunc, len(currentNode.middlewares))
+	middlewares = append(middlewares, currentNode.middlewares...)
+	for _, si := range s {
+		n := currentNode
+		for _, ch := range currentNode.children {
+			if ch.prefix == si {
+				currentNode = ch
+				middlewares = append(middlewares, currentNode.middlewares...)
+				break
+			}
+		}
+
+		if n == currentNode {
+			isNotMatch = true
+			break
+		}
+	}
+
+	if isNotMatch {
 		w.WriteHeader(404)
 		return
 	}
 
-	handler := route.handler
-	for _, m := range route.middlewares {
+	handler := currentNode.handler[method]
+	if handler == nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	// reverse middlewares
+	for i, j := 0, len(middlewares)-1; i < j; i, j = i+1, j-1 {
+		middlewares[i], middlewares[j] = middlewares[j], middlewares[i]
+	}
+
+	for _, m := range middlewares {
 		handler = m(handler)
 	}
+
 	handler(w, r)
 }
 
@@ -73,11 +113,11 @@ func (m *Mhf) Listen(addr string) {
 }
 
 func (m *Mhf) add(method, path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	if path[0] != '/' {
-		path = fmt.Sprintf("/%s", path)
+	if path[0] == '/' {
+		path = path[1:]
 	}
 
-	if r, _ := m.router.find(method, path); r != nil {
+	if n, _ := m.router.findNode(path); n != nil && n.handler[method] != nil {
 		fmt.Printf("%s(%s) is already resisted.", path, method)
 		return
 	}
@@ -102,31 +142,107 @@ func (m *Mhf) Delete(path string, handler http.HandlerFunc, middlewares ...Middl
 }
 
 func (m *Mhf) Middleware(path string, middleware MiddlewareFunc) {
-	for _, method := range methods {
-		r, err := m.router.find(method, path)
+	node, err := m.router.findNode(path)
+	if err != nil {
+		node, err = m.router.createNode(path)
 		if err != nil {
 			return
 		}
-
-		ms := append(r.middlewares, middleware)
-		m.router.add(method, path, r.handler, ms...)
 	}
+	if err != nil {
+		return
+	}
+
+	node.middlewares = append(node.middlewares, middleware)
 }
 
 func (r *Router) add(method, path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	r.routes[method+path] = &Route{
-		method:      method,
-		path:        path,
-		handler:     handler,
-		middlewares: middlewares,
+	node, err := r.findNode(path)
+	if err != nil {
+		node, err = r.createNode(path)
+		if err != nil {
+			return
+		}
 	}
+
+	for _, m := range middlewares {
+		handler = m(handler)
+	}
+
+	node.handler[method] = handler
 }
 
-func (r *Router) find(method, path string) (*Route, error) {
-	rs := r.routes[method+path]
-	if rs == nil {
-		return nil, errors.New(fmt.Sprintf("%s(%s) is not found", path, method))
+func (r *Router) createNode(path string) (*Node, error) {
+	path = deleteSlushPrefix(path)
+	s := strings.Split(path, "/")
+	var rest []string
+
+	currentNode := r.tree
+	for i, si := range s {
+		n := currentNode
+		for _, ch := range currentNode.children {
+			if ch.prefix == si {
+				currentNode = ch
+				break
+			}
+		}
+
+		if n == currentNode {
+			rest = s[i:]
+			break
+		}
 	}
 
-	return rs, nil
+	parent := currentNode
+	for _, ri := range rest {
+		n := &Node{
+			parent:      parent,
+			children:    make([]*Node, 0),
+			prefix:      ri,
+			handler:     make(map[string]http.HandlerFunc),
+			middlewares: make([]MiddlewareFunc, 0),
+		}
+
+		parent.children = append(parent.children, n)
+
+		parent = n
+	}
+
+	currentNode = parent
+	return currentNode, nil
+}
+
+func (r *Router) findNode(path string) (*Node, error) {
+	path = deleteSlushPrefix(path)
+	s := strings.Split(path, "/")
+	currentNode := r.tree
+	isNotMatch := false
+	for _, si := range s {
+		n := currentNode
+		for _, ch := range currentNode.children {
+			if ch.prefix == si {
+				currentNode = ch
+				break
+			}
+		}
+
+		if n == currentNode {
+			isNotMatch = true
+			break
+		}
+	}
+
+	if isNotMatch {
+		return nil, errors.New(fmt.Sprintf("%s is not found", path))
+	}
+
+	return currentNode, nil
+}
+
+func deleteSlushPrefix(s string) string {
+	if s[0] == '/' {
+		s = s[1:]
+	}
+
+	return s
 }
