@@ -10,15 +10,27 @@ import (
 func main() {
 	m := mhf.New()
 
+	m.Middleware("/", Logger)
+	m.Middleware("/foo", func(hf http.HandlerFunc) http.HandlerFunc {
+		return func(rw http.ResponseWriter, r *http.Request) {
+			fmt.Println("/foo")
+			hf(rw, r)
+		}
+	})
+	m.Middleware("/foo/bar", func(hf http.HandlerFunc) http.HandlerFunc {
+		return func(rw http.ResponseWriter, r *http.Request) {
+			fmt.Println("/bar")
+			hf(rw, r)
+		}
+	})
+
 	m.Get("/foo", func(rw http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(rw, "GET /foo")
 	})
 
-	m.Post("/foo", func(rw http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(rw, "POST /foo")
+	m.Get("/foo/bar", func(rw http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(rw, "GET /foo")
 	})
-
-	m.Middleware("/foo", Logger)
 
 	m.Listen(":8080")
 }
