@@ -55,45 +55,34 @@ func New() *Mhf {
 
 func (m *Mhf) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	method := r.Method
-	path := deleteSlushPrefix(r.URL.Path)
-
-	s := strings.Split(path, "/")
-
-	currentNode := m.router.tree
-	isNotMatch := false
-
-	middlewares := currentNode.middlewares
-
-	for _, si := range s {
-		n := currentNode
-		for _, ch := range currentNode.children {
-			if ch.prefix == si {
-				currentNode = ch
-				middlewares = append(middlewares, currentNode.middlewares...)
-				break
-			}
-		}
-
-		if n == currentNode {
-			isNotMatch = true
-			break
-		}
-	}
-
-	if isNotMatch {
+	node, err := m.router.findNode(r.URL.Path)
+	if err != nil {
 		w.WriteHeader(404)
 		return
 	}
 
-	handler := currentNode.handler[method]
+	handler := node.handler[method]
 	if handler == nil {
 		w.WriteHeader(404)
 		return
 	}
 
-	// reverse middlewares
-	for i, j := 0, len(middlewares)-1; i < j; i, j = i+1, j-1 {
-		middlewares[i], middlewares[j] = middlewares[j], middlewares[i]
+	reverse := func(ms []MiddlewareFunc) []MiddlewareFunc {
+		for i, j := 0, len(ms)-1; i < j; i, j = i+1, j-1 {
+			ms[i], ms[j] = ms[j], ms[i]
+		}
+
+		return ms
+	}
+
+	middlewares := make([]MiddlewareFunc, 0)
+
+	for {
+		middlewares = append(middlewares, reverse(node.middlewares)...)
+		node = node.parent
+		if node == nil {
+			break
+		}
 	}
 
 	for _, m := range middlewares {
