@@ -29,7 +29,20 @@ func main() {
 	})
 
 	m.Get("/foo/bar", func(rw http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(rw, "GET /foo")
+		fmt.Fprint(rw, "GET /foo/bar")
+	})
+
+	g, _ := m.Group("/baz", func(hf http.HandlerFunc) http.HandlerFunc {
+		return func(rw http.ResponseWriter, r *http.Request) {
+			fmt.Println("/baz")
+			hf(rw, r)
+		}
+	})
+	g.Get("/", func(rw http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(rw, "GET /baz")
+	})
+	g.Get("/bar", func(rw http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(rw, "GET /baz/bar")
 	})
 
 	m.Listen(":8080")
