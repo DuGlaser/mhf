@@ -136,6 +136,24 @@ func (m *Mhf) Middleware(path string, middleware MiddlewareFunc) {
 	node.middlewares = append(node.middlewares, middleware)
 }
 
+func (m *Mhf) Group(path string, middlewares ...MiddlewareFunc) (*Mhf, error) {
+	node, err := m.router.findNode(path)
+	if err != nil {
+		node, err = m.router.createNode(path)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	node.middlewares = append(node.middlewares, middlewares...)
+
+	return &Mhf{
+		router: &Router{
+			tree: node,
+		},
+	}, nil
+}
+
 func (r *Router) add(method, path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
 	node, err := r.findNode(path)
 	if err != nil {
@@ -225,7 +243,14 @@ func (r *Router) findNode(path string) (*Node, error) {
 }
 
 func deleteSlushPrefix(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+
 	if s[0] == '/' {
+		if len(s) == 1 {
+			return ""
+		}
 		s = s[1:]
 	}
 
