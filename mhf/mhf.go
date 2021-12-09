@@ -3,13 +3,11 @@ package mhf
 import (
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 )
 
 type Mhf struct {
-	server *http.Server
 	router *Router
 }
 
@@ -38,7 +36,6 @@ type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
 func New() *Mhf {
 	m := &Mhf{
-		server: new(http.Server),
 		router: &Router{
 			tree: &Node{
 				prefix:      "",
@@ -49,7 +46,6 @@ func New() *Mhf {
 		},
 	}
 
-	m.server.Handler = m
 	return m
 }
 
@@ -93,12 +89,7 @@ func (m *Mhf) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Mhf) Listen(addr string) {
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		panic(err)
-	}
-
-	m.server.Serve(l)
+	http.ListenAndServe(addr, m)
 }
 
 func (m *Mhf) add(method, path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
