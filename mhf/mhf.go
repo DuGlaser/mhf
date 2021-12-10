@@ -8,7 +8,7 @@ import (
 )
 
 type Mhf struct {
-	router *Router
+	Router
 }
 
 type Router struct {
@@ -36,7 +36,7 @@ type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
 func New() *Mhf {
 	m := &Mhf{
-		router: &Router{
+		Router: Router{
 			tree: &Node{
 				prefix:      "",
 				children:    make([]*Node, 0),
@@ -51,7 +51,7 @@ func New() *Mhf {
 
 func (m *Mhf) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	method := r.Method
-	node, err := m.router.findNode(r.URL.Path)
+	node, err := m.findNode(r.URL.Path)
 	if err != nil {
 		w.WriteHeader(404)
 		return
@@ -97,34 +97,34 @@ func (m *Mhf) add(method, path string, handler http.HandlerFunc, middlewares ...
 		path = path[1:]
 	}
 
-	if n, _ := m.router.findNode(path); n != nil && n.handler[method] != nil {
+	if n, _ := m.findNode(path); n != nil && n.handler[method] != nil {
 		fmt.Printf("%s(%s) is already resisted.", path, method)
 		return
 	}
 
-	m.router.add(method, path, handler, middlewares...)
+	m.add(method, path, handler, middlewares...)
 }
 
-func (m *Mhf) Get(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add(http.MethodGet, path, handler, middlewares...)
+func (r *Router) Get(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	r.add(http.MethodGet, path, handler, middlewares...)
 }
 
-func (m *Mhf) Post(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add(http.MethodPost, path, handler, middlewares...)
+func (r *Router) Post(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	r.add(http.MethodPost, path, handler, middlewares...)
 }
 
-func (m *Mhf) Put(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add(http.MethodPut, path, handler, middlewares...)
+func (r *Router) Put(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	r.add(http.MethodPut, path, handler, middlewares...)
 }
 
-func (m *Mhf) Delete(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	m.add(http.MethodDelete, path, handler, middlewares...)
+func (r *Router) Delete(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
+	r.add(http.MethodDelete, path, handler, middlewares...)
 }
 
-func (m *Mhf) Middleware(path string, middleware MiddlewareFunc) {
-	node, err := m.router.findNode(path)
+func (r *Router) Middleware(path string, middleware MiddlewareFunc) {
+	node, err := r.findNode(path)
 	if err != nil {
-		node, err = m.router.createNode(path)
+		node, err = r.createNode(path)
 		if err != nil {
 			return
 		}
@@ -136,10 +136,10 @@ func (m *Mhf) Middleware(path string, middleware MiddlewareFunc) {
 	node.middlewares = append(node.middlewares, middleware)
 }
 
-func (m *Mhf) Group(path string, middlewares ...MiddlewareFunc) (*Mhf, error) {
-	node, err := m.router.findNode(path)
+func (r *Router) Group(path string, middlewares ...MiddlewareFunc) (*Router, error) {
+	node, err := r.findNode(path)
 	if err != nil {
-		node, err = m.router.createNode(path)
+		node, err = r.createNode(path)
 		if err != nil {
 			return nil, err
 		}
@@ -147,10 +147,8 @@ func (m *Mhf) Group(path string, middlewares ...MiddlewareFunc) (*Mhf, error) {
 
 	node.middlewares = append(node.middlewares, middlewares...)
 
-	return &Mhf{
-		router: &Router{
-			tree: node,
-		},
+	return &Router{
+		tree: node,
 	}, nil
 }
 
