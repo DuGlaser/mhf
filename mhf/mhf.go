@@ -92,19 +92,6 @@ func (m *Mhf) Listen(addr string) {
 	http.ListenAndServe(addr, m)
 }
 
-func (m *Mhf) add(method, path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
-	if path[0] == '/' {
-		path = path[1:]
-	}
-
-	if n, _ := m.findNode(path); n != nil && n.handler[method] != nil {
-		fmt.Printf("%s(%s) is already resisted.", path, method)
-		return
-	}
-
-	m.add(method, path, handler, middlewares...)
-}
-
 func (r *Router) Get(path string, handler http.HandlerFunc, middlewares ...MiddlewareFunc) {
 	r.add(http.MethodGet, path, handler, middlewares...)
 }
