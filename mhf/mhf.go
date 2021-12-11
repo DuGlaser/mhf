@@ -39,10 +39,11 @@ func New() *Mhf {
 	m := &Mhf{
 		Router: Router{
 			tree: &Node{
-				prefix:      "",
-				children:    make([]*Node, 0),
-				handler:     make(map[string]http.HandlerFunc),
-				middlewares: make([]MiddlewareFunc, 0),
+				prefix:         "",
+				children:       make([]*Node, 0),
+				handler:        make(map[string]http.HandlerFunc),
+				middlewares:    make([]MiddlewareFunc, 0),
+				isVariableNode: false,
 			},
 		},
 	}
