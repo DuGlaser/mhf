@@ -220,23 +220,20 @@ func (r *Router) findNode(path string) (*Node, error) {
 	for _, si := range s {
 		nodes := matchNodes
 		matchNodes = []*Node{}
-		updated := false
 
 		for _, n := range nodes {
 			for _, ch := range n.children {
 				if ch.prefix == si {
 					matchNodes = append(matchNodes, ch)
-					updated = true
 				}
 
 				if len(ch.prefix) > 0 && ch.prefix[0] == ':' {
 					matchNodes = append(matchNodes, ch)
-					updated = true
 				}
 			}
 		}
 
-		if !updated {
+		if len(matchNodes) == 0 {
 			break
 		}
 	}
