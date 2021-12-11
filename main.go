@@ -27,7 +27,9 @@ func main() {
 	m.Get("/foo", func(rw http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(rw, "GET /foo")
 	})
-
+	m.Get("/foo/:id", func(rw http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(rw, "GET /foo/:id")
+	})
 	m.Get("/foo/bar", func(rw http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(rw, "GET /foo/bar")
 	})
