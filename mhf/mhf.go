@@ -16,11 +16,12 @@ type Router struct {
 }
 
 type Node struct {
-	parent      *Node
-	children    []*Node
-	prefix      string
-	handler     map[string]http.HandlerFunc
-	middlewares []MiddlewareFunc
+	parent         *Node
+	children       []*Node
+	prefix         string
+	handler        map[string]http.HandlerFunc
+	middlewares    []MiddlewareFunc
+	isVariableNode bool
 }
 
 var (
@@ -178,12 +179,23 @@ func (r *Router) createNode(path string) (*Node, error) {
 
 	parent := currentNode
 	for _, ri := range rest {
+		isVariablePath := false
+
+		if parent != nil && parent.isVariableNode {
+			isVariablePath = true
+		}
+
+		if len(ri) > 0 && ri[0] == ':' {
+			isVariablePath = true
+		}
+
 		n := &Node{
-			parent:      parent,
-			children:    make([]*Node, 0),
-			prefix:      ri,
-			handler:     make(map[string]http.HandlerFunc),
-			middlewares: make([]MiddlewareFunc, 0),
+			parent:         parent,
+			children:       make([]*Node, 0),
+			prefix:         ri,
+			handler:        make(map[string]http.HandlerFunc),
+			middlewares:    make([]MiddlewareFunc, 0),
+			isVariableNode: isVariablePath,
 		}
 
 		parent.children = append(parent.children, n)
@@ -204,27 +216,48 @@ func (r *Router) findNode(path string) (*Node, error) {
 		return currentNode, nil
 	}
 
-	isNotMatch := false
+	matchNodes := []*Node{currentNode}
 	for _, si := range s {
-		n := currentNode
-		for _, ch := range currentNode.children {
-			if ch.prefix == si {
-				currentNode = ch
-				break
+		nodes := matchNodes
+		matchNodes = []*Node{}
+		updated := false
+
+		for _, n := range nodes {
+			for _, ch := range n.children {
+				if ch.prefix == si {
+					matchNodes = append(matchNodes, ch)
+					updated = true
+				}
+
+				if len(ch.prefix) > 0 && ch.prefix[0] == ':' {
+					matchNodes = append(matchNodes, ch)
+					updated = true
+				}
 			}
 		}
 
-		if n == currentNode {
-			isNotMatch = true
+		if !updated {
 			break
 		}
 	}
 
-	if isNotMatch {
+	if len(matchNodes) == 0 {
 		return nil, errors.New(fmt.Sprintf("%s is not found", path))
 	}
 
-	return currentNode, nil
+	var node *Node
+	for _, n := range matchNodes {
+		if !n.isVariableNode {
+			node = n
+			break
+		}
+	}
+
+	if node == nil {
+		node = matchNodes[0]
+	}
+
+	return node, nil
 }
 
 func deleteSlushPrefix(s string) string {
